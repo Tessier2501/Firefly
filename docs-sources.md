@@ -181,7 +181,7 @@ common-telemetry-landingpage
 
 ### 4.2 注册步骤
 
-在 Firefly 仓库根目录执行。Firefly 当前没有任何提交，这不妨碍注册（实测通过）；首次 `git commit` 会把 `.gitmodules` 与四个 gitlink 一并入库。
+在 Firefly 仓库根目录执行。`docs-sources.md` 已在第一个提交 `ff9db6c` 入库，注册产生的 `.gitmodules` 与四个 gitlink 会进入**下一个**提交。
 
 ```powershell
 Set-Location 'C:\Users\35723\Documents\GitHub\Firefly'
