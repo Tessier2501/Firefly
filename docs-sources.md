@@ -152,11 +152,20 @@ common-MAVLink2-signing             common-donation
 common-telemetry-landingpage
 ```
 
-**2. 43 张图片**，位于仓库根 `images/`（不在 `planner/` 内）。例如 `images/mission_planner_screen_flight_plan.jpg`、`images/MP-*.png`、`images/can-slcan-mp-*.png`、`images/mp_*.jpg`。
+**2. 42 张图片**，位于仓库根 `images/`（不在 `planner/` 内）。例如 `images/mission_planner_screen_flight_plan.jpg`、`images/MP-*.png`、`images/can-slcan-mp-*.png`、`images/mp_*.jpg`。该数字由扫描 `planner/source/**/*.rst` 里全部 `images/*.{png,jpg,jpeg,gif}` 引用去重得到，并已逐个核实存在。
 
 **因此**：只取 `planner/` 会得到一个 1.9 MB 但交叉引用与配图大面积失效的残缺镜像。要「完整落到本地」，至少要同时取 `planner/` + `common/` + `images/`。
 
-代价说明：`common/source/docs/` 与 `images/` 的体积**未实测** —— 本次只核实了被引用文件的存在性，没有下载它们。`images/` 是 ardupilot_wiki 体积最大的目录之一，实际大小需在首次拉取时记录。
+**实测体积（首次落地后实测）**：
+
+| 路径 | 文件数 | 体积 |
+|---|---|---|
+| `planner/` | 34 | 1.91 MB |
+| `common/` | 718 | 4.35 MB |
+| `images/` | 2,487 | **574.50 MB** |
+| 合计 | 3,264 | **580.91 MB** |
+
+也就是 580.91 MB 里有 **98.9% 是 `images/`**，而 MP 页面实际只引用其中 42 张（占该目录文件数的 1.7%）。是否保留整个 `images/` 见 §8 的取舍。
 
 ## 4. 落地方式：git submodule
 
@@ -164,7 +173,7 @@ common-telemetry-landingpage
 
 | 仓库 | 打包体积 | 需要的部分 | 子模组路径 |
 |---|---|---|---|
-| `ardupilot_wiki` | ≈ 1.36 GB | 约 2 MB（另加 `common/` 与 `images/`） | `vendor/ardupilot_wiki` |
+| `ardupilot_wiki` | ≈ 1.36 GB | 1.91 MB + `common/` 4.35 MB + `images/` 574.50 MB | `vendor/ardupilot_wiki` |
 | `qgroundcontrol` | ≈ 551 MB | 24.3 MB | `vendor/qgroundcontrol` |
 | `mavlink-devguide` | ≈ 18 MB | 11.63 MB | `vendor/mavlink-devguide` |
 | `mavlink` | ≈ 15 MB | 1.02 MB | `vendor/mavlink` |
@@ -236,7 +245,7 @@ git commit -m "docs: add vendor submodules (Mission Planner / QGC / MAVLink docs
 三点说明：
 
 - `git add` 子模组路径时会提示 `warning: adding embedded git repository`，这是**预期**的：`.gitmodules` 已存在，gitlink 因此被正确记录，`git submodule status` 可验证。
-- 可选执行 `git submodule absorbgitdirs`，把各子模组的 `.git` 从子目录迁入母仓库的 `.git/modules/`，使布局回到标准形态（实测可用，不执行也不影响使用）。
+- 可选执行 `git submodule absorbgitdirs`，把各子模组的 `.git` 迁入母仓库的 `.git/modules/`，使布局回到标准形态。**它必须放在 `git submodule init` 之后**：init 之前子模组尚未登记到 `.git/config`，该命令会静默什么都不做（实测：顺序错时无任何输出且 `.git/modules` 不生成；顺序对时四个子模组各打印一行 `Migrating git directory of ...`）。迁移完成后，子模组目录里的 `.git` 变成指向 `.git/modules/...` 的文件。
 - `vendor/` 只是建议位置。`.gitmodules` 的 `path` 一旦提交即固定，之后改名要同时改 `path` 并移动目录，建议一次定好。
 
 补充一条设定：四个上游仓库的默认分支都是 `master`（不是 `main`），所以命令里显式写了 `--branch master`。
@@ -265,6 +274,7 @@ git clone --recurse-submodules <Firefly 的远端地址> Firefly
 |---|---|
 | `.gitmodules` 里的 `shallow = true` 是否生效 | **生效**，子模组是 depth 1 的浅克隆 |
 | 稀疏检出是否保留 | **不保留**，子模组会全量检出该提交（例如 mavlink-devguide 得到 362 个文件，而非稀疏后的 116 个） |
+| 检出的是哪个提交 | **记录的提交**，而不是上游当前 tip（隔离实验：远端 tip 已前进到第二个提交，全新克隆仍精确落在记录的第一个提交上）。这是子模组相对「照文档重新克隆」的关键优势：不会静默拿到比文档更新或更旧的内容 |
 
 因此新机器上克隆之后要**重新施加一次稀疏**（`.gitmodules` 没有存放稀疏路径的地方，见 §4.1 第 2 条）：
 
@@ -275,6 +285,18 @@ git -C vendor/mavlink       sparse-checkout set message_definitions doc
 ```
 
 实测：该命令把工作区从 362 个文件裁剪到 116 个，母仓库与子模组状态均保持干净。但它**不会缩小已经下载的对象**，磁盘占用只有在注册时就走 §4.2 的 blobless 方式才能省下来；若希望新机器也省流量，就在新机器上重复一遍 §4.2 的注册流程。
+
+**可选的省流量方案：`submodule.<name>.update = none`**
+
+隔离实验（纯本地仓库，与上游无关）确认：
+
+| 行为 | 实测结果 |
+|---|---|
+| `.gitmodules` 写入 `submodule.<name>.update = none` 后执行 `git clone --recurse-submodules` | 打印 `Skipping submodule '<path>'`，该子模组**完全不克隆**（目录为空、零字节） |
+| 此时 `git submodule status` | 该行带 `-` 前缀（未初始化） |
+| 改用 `git submodule update --init --checkout <path>` | 命令行 `--checkout` **可以覆盖**该设置，正常克隆并检出记录的提交 |
+
+代价：它会改变日常语义 —— `git submodule update` 与 `update --remote` 默认会跳过这些子模组，必须显式加 `--checkout`。因此**当前 `.gitmodules` 里没有写入该设置**，默认保持标准语义；只有在「新机器上希望像首次注册那样逐仓库 blobless + 稀疏、一字节不多下」时才临时启用，拉完再移除。若决定长期启用，务必把本节的两条更新命令都改成带 `--checkout` 的写法。
 
 ## 6. 落地目录
 
@@ -309,8 +331,8 @@ Firefly/                             <- 超级仓库，只存指针与本文件
 
 6. `vendor/ardupilot_wiki/planner/source/` 的 `.rst` 数量 = **19**（18 个内容页 + `index.rst`）；`planner/` 合计 = **34 文件**。
 7. `vendor/ardupilot_wiki/common/source/docs/` 中存在 §3 列出的 **34 个** `common-*` 页面。
-8. `vendor/ardupilot_wiki/images/` 中存在 §3 引用的 **43 张**图片。
-9. `vendor/qgroundcontrol/docs/en/` 文件数 = **148**；若只收英文，`docs/` 合计约为 148 + 366 + 12 = **526 文件**；全语言则为 **1,012 文件**。
+8. `vendor/ardupilot_wiki/images/` 中存在 §3 引用的 **42 张**图片。
+9. `vendor/qgroundcontrol/docs/en/` 文件数 = **148**；若只收英文，`docs/` 合计约为 148 + 366 + 12 = **526 文件**；全语言则为 **1,012 文件**。注意子模组目录本身的总文件数会更多（实测 1,051），因为 cone 模式的稀疏检出**总会带上仓库顶层文件**（`CMakeLists.txt`、`README.md` 等，实测多出 39 个）。
 10. `vendor/mavlink-devguide/en/messages/` 文件数 = **21**。
 11. `vendor/mavlink/message_definitions/v1.0/` 文件数 = **19**。
 12. 抽查编码：抽 5 个 `.rst` 与 5 个 `.md`，确认均为 UTF-8 且无乱码。
@@ -320,13 +342,15 @@ Firefly/                             <- 超级仓库，只存指针与本文件
 
 **Mission Planner 范围**（作用于 `vendor/ardupilot_wiki` 的稀疏路径；三选一，默认 A 档）：
 
-| 档 | 稀疏路径 | 结果 |
-|---|---|---|
-| A（推荐） | `planner common images` | 交叉引用与配图完整 |
-| B | `planner` | 1.9 MB，但 34 个链接与 43 张图失效 |
-| C | 不设稀疏（整个 ardupilot_wiki，5,532 文件） | 会一并带入飞控文档（`copter/ plane/ rover/ sub/ blimp/` 等），超出本次范围 |
+| 档 | 稀疏路径 | 实测体积 | 结果 |
+|---|---|---|---|
+| A（当前采用） | `planner common images` | 580.91 MB | 交叉引用与配图完整 |
+| B | `planner` + `common` | 6.26 MB | 文字与交叉引用完整，仅缺 42 张配图 |
+| C | 不设稀疏 | 整个 wiki tip | 会一并带入飞控文档（`copter/ plane/ rover/ sub/ blimp/` 等），超出本次范围 |
 
-切换方式：`git -C vendor/ardupilot_wiki sparse-checkout set <上表的路径>`。方向从 B 换到 A 会补齐缺失文件，反向则会裁剪工作区。
+切换方式：`git -C vendor/ardupilot_wiki sparse-checkout set <上表的路径>`。从 A 换到 B 会把约 578 MB 的 `images/` 从工作区剔除，换回 A 会补齐。
+
+⚠️ 缩减稀疏路径**只裁剪工作区，不会缩小已经下载的 `.git` 对象**（实测 `sparse-checkout set` 不触碰 pack）。当前 `.git/modules/vendor/ardupilot_wiki` 内约有 550 MB 的 pack，要真正回收空间需要重新注册该子模组，或对子模组执行 `git gc`（后者本次未实测）。
 
 **语言范围**（默认全收，体积可忽略；需要精简时对相应子模组加稀疏即可）：
 
@@ -367,11 +391,11 @@ Firefly/                             <- 超级仓库，只存指针与本文件
 
 计量口径：仓库打包体积取自 GitHub API 的十进制 KB（1000 进制）；文件树的体积按 1024 进制统计。
 
-本次**未实测**的项目（正文已标注）：`common/source/docs/` 与 `images/` 的实际体积。
+原先标注「未实测」的 `common/source/docs/` 与 `images/` 体积，已在首次落地后实测（见 §3 的表格）；至此无遗留未实测项。
 
 ### 子模组机制的实测记录
 
-以下每条都在本机 git 2.55.0 + Windows 上实际执行过：
+以下每条都在本机 git 2.55.0 + Windows 上实际执行过（隔离实验与真实仓库各若干）：
 
 | 验证项 | 实测结果 |
 |---|---|
@@ -380,7 +404,10 @@ Firefly/                             <- 超级仓库，只存指针与本文件
 | 在尚无任何提交的仓库里注册 | **成功**（未诞生分支上 `git add` 与 `git submodule init` 均正常） |
 | 新克隆是否采纳 `shallow = true` | **是**；`clone --recurse-submodules` 与 `submodule update --init` 两条路径都得到 `is-shallow = true` |
 | 新克隆是否保留稀疏 | **否**（得到 362 个文件而非 116 个）；重新执行 `sparse-checkout set` 可裁剪回 116 个 |
+| 新克隆落在哪个提交 | **记录的提交**；远端 tip 已前进一个提交，克隆仍精确落在被记录的那个之上 |
+| `git submodule absorbgitdirs` 的时机 | **必须在 `submodule init` 之后**：之前调用静默无操作（`.git/modules` 不生成），之后调用四个子模组各打印一行迁移信息 |
+| `submodule.<name>.update = none` | 新克隆**整体跳过**该子模组（输出 `Skipping submodule ...`，目录为空、零字节）；`update --init --checkout` 可从命令行覆盖 |
 | `git submodule update --remote --depth 1 <path>` | 可用，正常同步且不拉历史 |
-| `git submodule absorbgitdirs` | 可用，把子模组的 `.git` 迁入母仓库的 `.git/modules/` |
 | 是否存在 `submodule.<name>.sparseCheckout` 配置 | **不存在**（`git help --config` 全量比对确认） |
+| 本地路径作为子模组 URL | git 默认拒绝（`fatal: transport 'file' not allowed`），隔离实验须加 `-c protocol.file.allow=always`；本方案用 https URL，不受影响 |
 
