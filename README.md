@@ -46,7 +46,7 @@ git -C qgroundcontrol rev-parse --is-shallow-repository     # 应为 false
 
 **有意包含**: Mission Planner 文档 (`planner/`) 与 APM Planner 2 文档 (`planner2/`), 跨机型页 (`common/`), ArduPilot 四个机型与 Blimp 的文档 (`copter/` `plane/` `rover/` `sub/` `blimp/`), `antennatracker/`, `mavproxy/`, 开发者文档 (`dev/`), ArduPilot 首页 (`ardupilot/`), 文档构建工具 (`scripts/`, Sphinx 扩展所在, 构建 wiki 文档必需) 与全部配图 (`images/`); QGroundControl 的用户指南与开发者指南, 实现源码与测试, 构建与打包工具 (`src/` `test/` `tools/` `cmake/` `deploy/` `custom-example/`); MAVLink 开发者指南 (含 `zh/ko`), 协议定义 XML, 组件元数据与生成工具.
 
-**有意不包含**:
+**有意不包含及原因**:
 
 | 未包含 | 原因 |
 |---|---|
