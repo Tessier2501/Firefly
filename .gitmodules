@@ -1,16 +1,17 @@
-[submodule "vendor/ardupilot_wiki"]
-	path = vendor/ardupilot_wiki
-	url = https://github.com/ArduPilot/ardupilot_wiki.git
-	shallow = true
-[submodule "vendor/qgroundcontrol"]
-	path = vendor/qgroundcontrol
-	url = https://github.com/mavlink/qgroundcontrol.git
-	shallow = true
-[submodule "vendor/mavlink-devguide"]
-	path = vendor/mavlink-devguide
-	url = https://github.com/mavlink/mavlink-devguide.git
-	shallow = true
-[submodule "vendor/mavlink"]
-	path = vendor/mavlink
+
+[submodule "mavlink"]
+	path = mavlink
 	url = https://github.com/mavlink/mavlink.git
-	shallow = true
+	branch = master
+[submodule "ardupilot_wiki"]
+	path = ardupilot_wiki
+	url = https://github.com/ArduPilot/ardupilot_wiki.git
+	branch = master
+[submodule "qgroundcontrol"]
+	path = qgroundcontrol
+	url = https://github.com/mavlink/qgroundcontrol.git
+	branch = master
+[submodule "mavlink-devguide"]
+	path = mavlink-devguide
+	url = https://github.com/mavlink/mavlink-devguide.git
+	branch = master
