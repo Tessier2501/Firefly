@@ -1,17 +1,17 @@
 
 [submodule "mavlink"]
-	path = docs/mavlink
+	path = docs/software/mavlink
 	url = https://github.com/mavlink/mavlink.git
 	branch = master
 [submodule "ardupilot_wiki"]
-	path = docs/ardupilot_wiki
+	path = docs/software/ardupilot_wiki
 	url = https://github.com/ArduPilot/ardupilot_wiki.git
 	branch = master
 [submodule "qgroundcontrol"]
-	path = docs/qgroundcontrol
+	path = docs/software/qgroundcontrol
 	url = https://github.com/mavlink/qgroundcontrol.git
 	branch = master
 [submodule "mavlink-devguide"]
-	path = docs/mavlink-devguide
+	path = docs/software/mavlink-devguide
 	url = https://github.com/mavlink/mavlink-devguide.git
 	branch = master
