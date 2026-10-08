@@ -282,10 +282,7 @@ def render_result(result: ProbeResult) -> List[str]:
     if result.sent_bytes:
         lines.append(f"  - 已发送 {result.sent_bytes} 字节 (--poke 的 GCS 心跳与能力查询)")
     if result.fb_markers:
-        lines.append(
-            f"  - 0xFB 起始字节 {result.fb_markers} 个: 若与字节数量级相当 (约每 17 字节 1 个),"
-            " 说明整条流都是唤醒前的异常起始字节帧; 少量则只是载荷里的巧合字节"
-        )
+        lines.append(f"  - 0xFB 起始字节 {result.fb_markers} 个")
     if types:
         lines.append(f"  - 解码到的类型: {types}")
     for item in result.heartbeats[:5]:
@@ -439,14 +436,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     lines.append("- 探测结果:")
     for result in results:
         lines.extend(render_result(result))
-    mavlink_ports = [result.device for result in results if result.heartbeats]
-    if mavlink_ports:
-        lines.append(f"- 结论: 收到飞控心跳的端口 {', '.join(mavlink_ports)}")
-    else:
-        lines.append(
-            "- 结论: 没有任何端口收到飞控心跳"
-            " (确认飞控已上电, 并用 --dtr / --no-dtr 各测一次对比)"
-        )
     lines.append("")
     with out_path.open("a", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n")

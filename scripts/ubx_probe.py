@@ -24,10 +24,6 @@ GNSS_NAMES = {
     5: "QZSS", 6: "GLONASS", 7: "NavIC",
 }
 CARR_SOLN = {0: "none", 1: "float", 2: "fixed"}
-RELPOSNED_FLAGS = {
-    0: "gnssFixOK", 1: "diffSoln", 2: "relPosValid", 3: "carrSoln_lo", 4: "carrSoln_hi",
-    5: "isMoving", 6: "refPosMiss", 7: "refObsMiss", 8: "relPosHeadingValid", 9: "relPosNormalized",
-}
 
 
 def ubx_frame(cls: int, mid: int, payload: bytes = b"") -> bytes:
@@ -69,19 +65,12 @@ def _text(raw: bytes) -> str:
 
 @dataclass
 class MonVer:
-    """MON-VER: 软件/硬件版本与全部扩展串 (HPG 版本藏在扩展里)."""
+    """MON-VER: 软件/硬件版本与全部扩展串."""
 
     sw_version: str
     hw_version: str
     extensions: list[str] = field(default_factory=list)
 
-    @property
-    def firmware(self) -> str:
-        """从扩展串里挑出 FWVER/HPG 那一条, 挑不到返回空串."""
-        for ext in self.extensions:
-            if ext.upper().startswith("FWVER") or "HPG" in ext.upper():
-                return ext
-        return ""
 
 
 def parse_mon_ver(payload: bytes) -> MonVer:
@@ -192,18 +181,9 @@ def report(port: str, baud: int, timeout: float, want_relposned: bool) -> int:
     print(f"  HW : {ver.hw_version}")
     for ext in ver.extensions:
         print(f"  扩展: {ext}")
-    fw = ver.firmware
-    print(f"  >>> HPG 固件行: {fw if fw else '未在扩展串里找到 FWVER/HPG'}")
-    if fw:
-        digits = [int(x) for x in fw.replace("=", " ").replace(".", " ").split() if x.isdigit()]
-        if len(digits) >= 2 and (digits[0], digits[1]) < (1, 30):
-            print(f"  >>> 判定: 版本疑似低于 1.30, 移动基线不可靠 -> 建议升级到 HPG 1.32")
-        elif digits:
-            print(f"  >>> 判定: 版本 {digits[0]}.{digits[1]} (要求 >= 1.30, 推荐 1.32)")
-
     payload = poll(port, baud, CLS_CFG, ID_CFG_GNSS, timeout)
     if payload is None:
-        print("CFG-GNSS 无回应 (不影响主判定)")
+        print("CFG-GNSS 无回应")
     else:
         print("星座配置:")
         for gnss_id, enable, max_ch in parse_cfg_gnss(payload):
@@ -212,7 +192,7 @@ def report(port: str, baud: int, timeout: float, want_relposned: bool) -> int:
     if want_relposned:
         payload = poll(port, baud, CLS_NAV, ID_RELPOSNED, timeout)
         if payload is None:
-            print("NAV-RELPOSNED 无回应 (需 base 已向 rover 提供 RTCM 且已成对工作)")
+            print("NAV-RELPOSNED 无回应")
         else:
             rp = parse_relposned(payload)
             print("NAV-RELPOSNED:")
@@ -233,7 +213,7 @@ def selftest() -> int:
     assert len(frames) == 2, frames
     ver = parse_mon_ver(frames[0][2])
     assert ver.hw_version == "00190000", ver
-    assert ver.firmware == "FWVER=HPG 1.32", ver.firmware
+    assert ver.extensions == ["FWVER=HPG 1.32", "PROTVER=27.11"], ver.extensions
     gnss = parse_cfg_gnss(frames[1][2])
     assert gnss == [(0, True, 8), (6, True, 14)], gnss
     rp_payload = bytearray(64)
