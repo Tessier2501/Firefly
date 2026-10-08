@@ -1,6 +1,6 @@
 # 官方参考材料检索规则 (项目级)
 
-适用范围: 本仓 `docs/` 下的四个文档子模组 (`docs/ardupilot_wiki/`, `docs/qgroundcontrol/`, `docs/mavlink-devguide/`, `docs/mavlink/`) 内的所有查证作业; 仓库根目录为无人机调试工作区, 文档检索一律从 `docs/` 开始. 与全局规则 (语言, 编码, 质量门禁) 互补, 不重复其内容; 目录范围与版本口径见上级目录的 `README.md`.
+适用范围: 本仓 `docs/` 下的四个文档子模组 (`docs/ardupilot_wiki/`, `docs/qgroundcontrol/`, `docs/mavlink-devguide/`, `docs/mavlink/`) 内的所有查证作业; 仓库的 `docs/` 为文档区, `scripts/` 与 `temp/` 为调试工作区, 文档检索一律从 `docs/` 开始. 与全局规则 (语言, 编码, 质量门禁) 互补, 不重复其内容; 目录范围与版本口径见 `docs/AGENTS.md`.
 
 ## 1. 先查文档, 源码只用于验证
 
