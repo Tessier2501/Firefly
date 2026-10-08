@@ -1,6 +1,6 @@
 # 官方参考材料检索规则 (项目级)
 
-适用范围: 本仓四个子模组 (`ardupilot_wiki/`, `qgroundcontrol/`, `mavlink-devguide/`, `mavlink/`) 下的所有查证作业. 与全局规则 (语言, 编码, 质量门禁) 互补, 不重复其内容; 目录范围与版本口径见上级目录的 `README.md`.
+适用范围: 本仓 `docs/` 下的四个文档子模组 (`docs/ardupilot_wiki/`, `docs/qgroundcontrol/`, `docs/mavlink-devguide/`, `docs/mavlink/`) 内的所有查证作业; 仓库根目录为无人机调试工作区, 文档检索一律从 `docs/` 开始. 与全局规则 (语言, 编码, 质量门禁) 互补, 不重复其内容; 目录范围与版本口径见上级目录的 `README.md`.
 
 ## 1. 先查文档, 源码只用于验证
 
@@ -8,7 +8,7 @@
 
 ## 2. 问题类型对应入口
 
-Mission Planner 的用法与行为查 `ardupilot_wiki/planner/` 与 `ardupilot_wiki/common/`; 机型相关配置查 `ardupilot_wiki/` 下对应机型目录 (`copter/`, `plane/`, `rover/`, `sub/`); QGroundControl 的用法查 `qgroundcontrol/docs/en/qgc-user-guide/`, 实现细节查 `qgroundcontrol/docs/en/qgc-dev-guide/` 并用 `qgroundcontrol/src/` 核对; MAVLink 的消息, 命令与方言查 `mavlink-devguide/en/messages/`, 而字段, 单位与 CRC 等机器事实以 `mavlink/message_definitions/v1.0/` 的 XML 为准.
+Mission Planner 的用法与行为查 `docs/ardupilot_wiki/planner/` 与 `docs/ardupilot_wiki/common/`; 机型相关配置查 `docs/ardupilot_wiki/` 下对应机型目录 (`copter/`, `plane/`, `rover/`, `sub/`); QGroundControl 的用法查 `docs/qgroundcontrol/docs/en/qgc-user-guide/`, 实现细节查 `docs/qgroundcontrol/docs/en/qgc-dev-guide/` 并用 `docs/qgroundcontrol/src/` 核对; MAVLink 的消息, 命令与方言查 `docs/mavlink-devguide/en/messages/`, 而字段, 单位与 CRC 等机器事实以 `docs/mavlink/message_definitions/v1.0/` 的 XML 为准.
 
 ## 3. 引用本地文件前必须打开确认
 

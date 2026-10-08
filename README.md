@@ -4,14 +4,26 @@ ArduPilot 生态的**本地文档镜像**: 把 ArduPilot, Mission Planner, QGrou
 
 ## 结构
 
-四个子模组直接位于仓库根目录:
+四个子模组位于 `docs/` 子目录下; 仓库根目录 (除本文件, `.clinerules/` 与 `docs/` 外) 作为无人机调试工作区, 用于放置调试脚本, 参数与日志等内容:
+
+```
+Firefly/
+├─ docs/                # 文档镜像 (四个子模组)
+│  ├─ ardupilot_wiki/
+│  ├─ qgroundcontrol/
+│  ├─ mavlink-devguide/
+│  └─ mavlink/
+├─ .clinerules/         # 检索规则
+├─ .gitmodules
+└─ README.md
+```
 
 | 路径 | 上游仓库 | 内容 | 检出范围 |
 |---|---|---|---|
-| `ardupilot_wiki/` | `ArduPilot/ardupilot_wiki` | ArduPilot 与 Mission Planner 的文档源 (reStructuredText + Sphinx) | **全量** |
-| `qgroundcontrol/` | `mavlink/qgroundcontrol` | QGroundControl 用户指南, 开发者指南与实现源码 (Markdown + VuePress + QML/C++) | `docs src test tools cmake deploy custom-example` |
-| `mavlink-devguide/` | `mavlink/mavlink-devguide` | MAVLink 开发者指南 (Markdown + VitePress) | **全量** |
-| `mavlink/` | `mavlink/mavlink` | MAVLink 协议定义 XML 与生成工具 | **全量** |
+| `docs/ardupilot_wiki/` | `ArduPilot/ardupilot_wiki` | ArduPilot 与 Mission Planner 的文档源 (reStructuredText + Sphinx) | **全量** |
+| `docs/qgroundcontrol/` | `mavlink/qgroundcontrol` | QGroundControl 用户指南, 开发者指南与实现源码 (Markdown + VuePress + QML/C++) | `docs src test tools cmake deploy custom-example` |
+| `docs/mavlink-devguide/` | `mavlink/mavlink-devguide` | MAVLink 开发者指南 (Markdown + VitePress) | **全量** |
+| `docs/mavlink/` | `mavlink/mavlink` | MAVLink 协议定义 XML 与生成工具 | **全量** |
 
 `ardupilot_wiki`, `mavlink-devguide`, `mavlink` 三个子模组是**完整检出**; `qgroundcontrol` 保留上表列出的稀疏范围. 四个子模组都是**完整克隆**, 因此子模组内 `git log`, `git blame` 可用.
 
@@ -38,8 +50,8 @@ git submodule status
 四行都应以**空格**开头: `-` 表示未初始化, `+` 表示工作区提交与记录不一致, 两者都不应出现.
 
 ```powershell
-git -C qgroundcontrol sparse-checkout list                  # 应列出上表的路径
-git -C qgroundcontrol rev-parse --is-shallow-repository     # 应为 false
+git -C docs/qgroundcontrol sparse-checkout list                  # 应列出上表的路径
+git -C docs/qgroundcontrol rev-parse --is-shallow-repository     # 应为 false
 ```
 
 ## 范围声明
@@ -50,9 +62,9 @@ git -C qgroundcontrol rev-parse --is-shallow-repository     # 应为 false
 
 | 未包含 | 原因 |
 |---|---|
-| `qgroundcontrol/resources/`, `translations/`, `android/` | 与文档无关的资源, 翻译与平台工程文件, 检索时排除 |
-| `mavlink/pymavlink/` | 嵌套子模组, 本镜像不需要; 需要时 `git -C mavlink submodule update --init pymavlink` |
-| MissionPlanner 源码仓库 | 文档在 `ardupilot_wiki/planner/`, 源码对查阅文档无必要 |
+| `docs/qgroundcontrol/` 下的 `resources/`, `translations/`, `android/` | 与文档无关的资源, 翻译与平台工程文件, 检索时排除 |
+| `docs/mavlink/pymavlink/` | 嵌套子模组, 本镜像不需要; 需要时 `git -C docs/mavlink submodule update --init pymavlink` |
+| MissionPlanner 源码仓库 | 文档在 `docs/ardupilot_wiki/planner/`, 源码对查阅文档无必要 |
 | 站点构建产物 (HTML) | 可由已收录的 `scripts/` 与 VitePress 现场构建 |
 
 检索顺序与噪声排除规则见 `.clinerules/01-doc-retrieval.md` (agent 在本仓库工作时自动生效).
