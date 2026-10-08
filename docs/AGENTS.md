@@ -33,8 +33,6 @@ git add . ; git commit -m "chore: bump doc submodules"
 
 ## 检索规则
 
-检索顺序与噪声排除规则见 `.clinerules/01-doc-retrieval.md`, 要点:
-
 - 顺序固定: 官方文档 -> 协议定义 -> 源码实现; 回答里区分文档结论与源码验证结论.
 - 默认排除 `images/`, `assets/`, `logos/`, `frontend/`, `.github/`, `test/`, `translations/`, `resources/` 以及翻译目录中的 `ko/`; 中文问题优先 `zh/`, 英文问题优先 `en/`.
 - 引用本地文件前必须实际打开确认; 文档里的交叉引用若指向本地路径, 该路径必须真实存在.
@@ -63,4 +61,4 @@ git add . ; git commit -m "chore: bump doc submodules"
 | FLYCOLOR | [中文](https://cn.fly-color.net/index.php?c=category&id=4) | [英文](https://en.fly-color.net/index.php?c=category&id=4) |
 | SUNNYSKY | [中文](http://www.rcsunnysky.com/Download/index.html) | [英文](http://en.rcsunnysky.com/Download/index.html) |
 
-如有需求, 请求用户下载所需文档到本地.
+如有需求, 请求用户下载所需文档到本地. 请勿尝试直接用脚本解析PDF文件.

@@ -23,15 +23,3 @@ python scripts\ubx_probe.py --port COM6 --poll relposned
 python scripts\ports-probe.py --list
 python scripts\ports-probe.py --all --seconds 5
 ```
-
-## 使用注意
-
-- `ports-probe.py` 默认只读; 只有显式 `--poke` 才会向端口写 GCS 心跳.
-- 移动基线 (GPS for Yaw) 需要 u-blox HPG >= 1.30, 推荐 1.32; 版本不足时的现象是 RTK 定位正常但 `GPS2_RAW.yaw` 恒 65535.
-- 脚本内的目录默认值沿用原 UAV 调试工作区的相对结构, 暂不调整, 待后续评估. 例如 `ports-probe.py` 的默认 `--out` 现在解析为仓库根的 `analysis/port_probe.md`, 需要写到别处时显式传 `--out`.
-
-## 约定
-
-- 新增或修改工具后必须跑一遍 `--selftest`; 没有自测入口的能力不进入本目录.
-- 硬件相关逻辑与解析逻辑分离, 保证无硬件时可自测; 失败即报错, 不静默继续.
-- 新增工具先用单文件实现; 需要共享代码时再评估, 不预先抽象.
