@@ -14,6 +14,7 @@
 |---|---|---|
 | `ubx_probe.py` | 直连 u-blox 模块: MON-VER 固件版本 (真版本在扩展串的 `FWVER=HPG x.y`), CFG-GNSS 星座配置, NAV-RELPOSNED 移动基线相对解 | `python scripts\ubx_probe.py --selftest` |
 | `ports-probe.py` | 串口链路只读探测: 判断 COM 口上是 MAVLink 飞控还是其它设备, 只有收到 HEARTBEAT 才算通 | `python scripts\ports-probe.py --selftest` |
+| `localize-images.py` | 把 URL 转换产物的远程图片下载到 `images/` 并改写 `full.md` / `main.html` / `content_list.json` 的引用 | `python scripts\localize-images.py --selftest` |
 
 常用用法:
 
@@ -22,4 +23,6 @@ python scripts\ubx_probe.py --port COM6 --baud 460800
 python scripts\ubx_probe.py --port COM6 --poll relposned
 python scripts\ports-probe.py --list
 python scripts\ports-probe.py --all --seconds 5
+python scripts\localize-images.py docs\hardware\CUAV
+python scripts\localize-images.py --dry-run docs\hardware\CUAV
 ```

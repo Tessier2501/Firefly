@@ -30,26 +30,6 @@ docs/
 
 `ardupilot_wiki`, `mavlink-devguide`, `mavlink` 为完整检出, `qgroundcontrol` 为稀疏检出; 四个子模组都是完整克隆, 子模组内 `git log`, `git blame` 可用.
 
-### 版本与校验
-
-版本状态以 `git submodule status` 为准, 不要以任何文档为准.
-
-```powershell
-git submodule status                                                  # 四行都应以空格开头: - 未初始化, + 与记录不一致, 两者都不应出现
-git -C docs/software/qgroundcontrol sparse-checkout list              # 应列出上表的稀疏路径
-git -C docs/software/qgroundcontrol rev-parse --is-shallow-repository # 应为 false
-```
-
-### 升级
-
-```powershell
-git submodule update --remote
-git submodule status
-git add . ; git commit -m "chore: bump doc submodules"
-```
-
-`--remote` 取 `.gitmodules` 记录的分支 (均为 `master`) 的最新提交; 升级结果作为一次提交留在本仓库, 可 diff, 可回滚.
-
 ### 检索规则
 
 - 顺序固定: 官方文档 -> 协议定义 -> 源码实现; 回答里区分文档结论与源码验证结论.
@@ -64,7 +44,9 @@ git add . ; git commit -m "chore: bump doc submodules"
 
 ## hardware
 
-硬件资料按厂商放在 `docs/hardware/<厂商>/` (本目录不入 Git, 只在本机维护). 本地内容为 MinerU 的转换产物, 目录形如 `<原文件名>.pdf-<uuid>/`:
+硬件资料按厂商放在 `docs/hardware/<厂商>/`; 现有 CUAV, FLYCOLOR, SIYI, SUNNYSKY, 可按产品/主题分层 (如 `CUAV/V5+智能控制器/`). 产物目录按来源分两种格式.
+
+PDF 转换产物:
 
 ```text
 <原文件名>.pdf-<uuid>/
@@ -75,16 +57,27 @@ git add . ; git commit -m "chore: bump doc submodules"
 |-- *_content_list.json        内容列表
 |-- *_content_list_v2.json     内容列表 (按页)
 |-- *_model.json               模型输出
-|-- MinerU_markdown_*.md       客户端导出的 Markdown, 与 full.md 同源
+|-- MinerU_markdown_*.md       与 full.md 同源
 `-- *_origin.pdf               原始 PDF, 只留存不解析
+```
+
+URL 转换产物:
+
+```text
+<网页标题>-<uuid>/
+|-- full.md                    正文 (主读)
+|-- main.html                  提取后正文 HTML
+|-- content_list.json          内容列表
+`-- images/                    图片
 ```
 
 ### 读取规则
 
-- 先读 `full.md`; 图片是正文的一部分, 接口/接线/尺寸等内容直接看 `images/`, 不要因为正文没写就当缺失.
+- 先读 `full.md`; 图片在 `images/` 下, 接口/接线/尺寸等内容直接看图, 不要因为正文没写就当缺失.
 - `*_origin.pdf` **不解析**: 只作留存与人工溯源, 任何 agent 都不得用脚本或工具解析它.
-- `layout.json`, `block_list.json`, `*_content_list*.json`, `*_model.json` 在需要结构化定位时备用, 不替代正文阅读.
+- `layout.json`, `block_list.json`, `*_content_list*.json`, `*_model.json` 在需要结构化定位时备用, 不替代正文阅读; URL 产物只有 `content_list.json`.
 - `MinerU_markdown_*.md` 与 `full.md` 同源, 二选一即可.
+- 正文中的外部链接 (如 ardupilot.org, px4 docs) 只作引用, 不要顺着抓取.
 
 ### 回退规则
 
