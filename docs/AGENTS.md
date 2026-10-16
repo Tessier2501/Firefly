@@ -4,17 +4,18 @@
 
 ```text
 docs/
+|-- AGENTS.md
 |-- software/
 |   |-- ardupilot_wiki/
 |   |-- qgroundcontrol/
 |   |-- mavlink-devguide/
 |   `-- mavlink/
-|-- hardware/
-|   |-- CUAV/
-|   |-- FLYCOLOR/
-|   |-- SIYI/
-|   `-- SUNNYSKY/
-`-- AGENTS.md
+`-- hardware/
+    |-- CUAV/
+    |-- FLYCOLOR/
+    |-- RadioLink/
+    |-- SIYI/
+    `-- SUNNYSKY/
 ```
 
 ## software
