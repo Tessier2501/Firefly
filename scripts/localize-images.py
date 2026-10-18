@@ -1,14 +1,4 @@
-r"""把 URL 转换产物中的远程图片下载到 images/, 并把引用改写为本地路径.
-
-URL 产物 (MinerU 客户端) 由 full.md, main.html, content_list.json 组成, 图片是远程 URL.
-本脚本下载这些图片到产物目录的 images/, 并把三个文件中的引用改写为 images/<hash>.<ext>,
-使 URL 产物与 PDF 转换产物的读取方式一致.
-
-用法:
-    python localize-images.py <产物目录或上级目录> [...]
-    python localize-images.py --dry-run docs\hardware\CUAV
-    python localize-images.py --selftest
-"""
+r"""把 URL 转换产物中的远程图片下载到 images/, 并把引用改写为本地路径。"""
 
 from __future__ import annotations
 
@@ -28,12 +18,12 @@ HTML_IMG_RE = re.compile(r'<img\b[^>]*?\bsrc="([^"]+)"', re.IGNORECASE)
 
 
 def is_url_product(path: Path) -> bool:
-    """URL 转换产物: 同时含 full.md, main.html, content_list.json."""
+    """URL 转换产物：同时含 full.md, main.html, content_list.json."""
     return all((path / name).is_file() for name in ("full.md", "main.html", "content_list.json"))
 
 
 def find_products(paths: list[Path]) -> list[Path]:
-    """把参数展开为 URL 产物目录: 自身是产物就用自身, 否则递归查找."""
+    """把参数展开为 URL 产物目录：自身是产物就用自身，否则递归查找."""
     found: list[Path] = []
     for path in paths:
         candidates = [path] if is_url_product(path) else sorted(
@@ -74,7 +64,7 @@ def collect_urls(product: Path) -> list[str]:
 
 
 def url_ext(url: str) -> str:
-    """从 URL 路径取允许的图片扩展名, 取不到返回空串."""
+    """从 URL 路径取允许的图片扩展名，取不到返回空串."""
     ext = Path(urlparse(url).path).suffix.lower()
     return ext if ext in ALLOWED_EXT else ""
 
@@ -106,7 +96,7 @@ def fetch(url: str, timeout: float) -> bytes:
 
 
 def rewrite_refs(product: Path, mapping: dict[str, str], dry_run: bool) -> list[str]:
-    """把三个文件里的远程 URL 替换为本地路径, 返回被改写的文件名."""
+    """把三个文件里的远程 URL 替换为本地路径，返回被改写的文件名."""
     changed: list[str] = []
     for name in ("full.md", "main.html", "content_list.json"):
         path = product / name
@@ -122,12 +112,12 @@ def rewrite_refs(product: Path, mapping: dict[str, str], dry_run: bool) -> list[
         files = [(product / name).read_text(encoding="utf-8") for name in ("full.md", "main.html", "content_list.json")]
         leftover = [url for url in mapping if any(url in text for text in files)]
         if leftover:
-            raise RuntimeError("仍有未改写的远程引用: " + ", ".join(leftover[:3]))
+            raise RuntimeError("仍有未改写的远程引用：" + ", ".join(leftover[:3]))
     return changed
 
 
 def localize(product: Path, timeout: float, dry_run: bool) -> tuple[int, int, list[str]]:
-    """处理一个产物: 下载图片并改写引用. 返回 (新下载数, 复用数, 错误列表)."""
+    """处理一个产物：下载图片并改写引用。返回（新下载数，复用数，错误列表）."""
     urls = collect_urls(product)
     images = product / "images"
     mapping: dict[str, str] = {}
@@ -158,7 +148,7 @@ def localize(product: Path, timeout: float, dry_run: bool) -> tuple[int, int, li
 
 
 def selftest() -> int:
-    """离线自测: 收集 URL, 命名与改写逻辑 (不联网)."""
+    """离线自测：收集 URL, 命名与改写逻辑（不联网）."""
     checks: list[tuple[str, bool]] = []
     with tempfile.TemporaryDirectory() as tmp:
         product = Path(tmp) / "样例-0000"
@@ -191,18 +181,18 @@ def selftest() -> int:
 def main(argv: list[str] | None = None) -> int:
     """命令行入口."""
     parser = argparse.ArgumentParser(description="把 URL 转换产物的远程图片下载到 images/ 并改写引用.")
-    parser.add_argument("paths", nargs="*", help="URL 产物目录, 或包含产物的上级目录")
-    parser.add_argument("--dry-run", action="store_true", help="只统计与预览, 不下载不写文件")
+    parser.add_argument("paths", nargs="*", help="URL 产物目录，或包含产物的上级目录")
+    parser.add_argument("--dry-run", action="store_true", help="只统计与预览，不下载不写文件")
     parser.add_argument("--timeout", type=float, default=30.0, help="单张图片下载超时秒数")
-    parser.add_argument("--selftest", action="store_true", help="离线自测, 不联网")
+    parser.add_argument("--selftest", action="store_true", help="离线自测，不联网")
     args = parser.parse_args(argv)
     if args.selftest:
         return selftest()
     if not args.paths:
-        parser.error("需要产物目录 (或 --selftest)")
+        parser.error("需要产物目录（或 --selftest）")
     products = find_products([Path(item) for item in args.paths])
     if not products:
-        raise SystemExit("没有找到 URL 转换产物 (需同时含 full.md, main.html, content_list.json)")
+        raise SystemExit("没有找到 URL 转换产物（需同时含 full.md, main.html, content_list.json）")
     failures: list[str] = []
     for product in products:
         count = len(collect_urls(product))
@@ -210,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{product}: 图片 {count} 个, 新下载 {downloaded}, 复用 {reused}")
         failures.extend(f"{product}: {error}" for error in errors)
     if failures:
-        print("以下图片下载失败 (引用保持远程):", file=sys.stderr)
+        print("以下图片下载失败（引用保持远程）:", file=sys.stderr)
         for item in failures:
             print("  " + item, file=sys.stderr)
         return 1

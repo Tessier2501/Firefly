@@ -1,10 +1,4 @@
-"""UBX 轮询探针: 直连 u-blox 模块, 读固件版本 / 星座配置 / 移动基线相对解.
-
-模块上电后 (USB 或 USB-TTL 接 UART) 直接问它本人, 不经过飞控与 u-center:
-  python .\\ubx_probe.py --port COM7 --baud 460800        # MON-VER + CFG-GNSS
-  python .\\ubx_probe.py --port COM7 --poll relposned     # NAV-RELPOSNED (需 base+rover 成对工作)
-  python .\\ubx_probe.py --selftest                       # 无硬件自测解析路径
-"""
+"""UBX 轮询探针：直连 u-blox 模块，读固件版本 / 星座配置 / 移动基线相对解。"""
 
 from __future__ import annotations
 
@@ -27,7 +21,7 @@ CARR_SOLN = {0: "none", 1: "float", 2: "fixed"}
 
 
 def ubx_frame(cls: int, mid: int, payload: bytes = b"") -> bytes:
-    """组一帧 UBX (含 Fletcher 校验)."""
+    """组一帧 UBX（含 Fletcher 校验）."""
     body = bytes([cls, mid]) + len(payload).to_bytes(2, "little") + payload
     ck_a = ck_b = 0
     for byte in body:
@@ -37,7 +31,7 @@ def ubx_frame(cls: int, mid: int, payload: bytes = b"") -> bytes:
 
 
 def parse_frames(buf: bytes) -> list[tuple[int, int, bytes]]:
-    """从字节流里切出所有校验通过的 UBX 帧, 返回 (cls, mid, payload)."""
+    """从字节流里切出所有校验通过的 UBX 帧，返回 (cls, mid, payload)."""
     out: list[tuple[int, int, bytes]] = []
     i = 0
     while True:
@@ -74,7 +68,7 @@ class MonVer:
 
 
 def parse_mon_ver(payload: bytes) -> MonVer:
-    """解析 MON-VER 载荷: 30 字节软件版本 + 10 字节硬件版本 + N x 30 字节扩展."""
+    """解析 MON-VER 载荷：30 字节软件版本 + 10 字节硬件版本 + N x 30 字节扩展."""
     if len(payload) < 40:
         raise ValueError(f"MON-VER 载荷过短: {len(payload)} 字节")
     sw = _text(payload[0:30])
@@ -84,7 +78,7 @@ def parse_mon_ver(payload: bytes) -> MonVer:
 
 
 def parse_cfg_gnss(payload: bytes) -> list[tuple[int, bool, int]]:
-    """解析 CFG-GNSS: 返回 [(gnssId, 是否使能, 通道数)]."""
+    """解析 CFG-GNSS: 返回 [（gnssId, 是否使能，通道数）]."""
     if len(payload) < 4:
         raise ValueError("CFG-GNSS 载荷过短")
     count = payload[3]
@@ -102,7 +96,7 @@ def parse_cfg_gnss(payload: bytes) -> list[tuple[int, bool, int]]:
 
 @dataclass
 class RelPosNed:
-    """NAV-RELPOSNED: 移动基线相对解 (航向来自这里)."""
+    """NAV-RELPOSNED: 移动基线相对解（航向来自这里）."""
 
     version: int
     ref_station_id: int
@@ -124,12 +118,7 @@ class RelPosNed:
 
 
 def parse_relposned(payload: bytes) -> RelPosNed:
-    """解析 NAV-RELPOSNED version 1 (F9P 实测 64 字节).
-
-    字段偏移 (按实测 hex 逐字节核对): relPosN/E/D=8/12/16, relPosLength=20, relPosHeading=24,
-    reserved2=28, relPosHPN/E/D/Length=32..35 (各 1 字节), accN/E/D/Length=36..51,
-    accHeading=**52**, flags=**56**, reserved3=60.
-    """
+    """解析 NAV-RELPOSNED version 1（F9P 实测 64 字节）。"""
     if len(payload) < 64:
         raise ValueError(f"NAV-RELPOSNED 载荷 {len(payload)} 字节, 期望 >= 64 (version 1)")
     def i4(off: int) -> int:
@@ -150,8 +139,8 @@ def parse_relposned(payload: bytes) -> RelPosNed:
 
 
 def poll(port: str, baud: int, cls: int, mid: int, timeout: float) -> bytes | None:
-    """发一次轮询并等回应, 返回载荷; 超时返回 None."""
-    import serial  # 延迟导入: 没装 pyserial 时只有这里会报错
+    """发一次轮询并等回应，返回载荷；超时返回 None."""
+    import serial  # 延迟导入：缺 pyserial 时只有串口路径报错
 
     with serial.Serial(port, baud, timeout=0.2) as ser:
         ser.reset_input_buffer()
@@ -169,11 +158,11 @@ def poll(port: str, baud: int, cls: int, mid: int, timeout: float) -> bytes | No
 
 
 def report(port: str, baud: int, timeout: float, want_relposned: bool) -> int:
-    """连模块跑一轮检查, 打印结果; 返回进程退出码."""
+    """连模块跑一轮检查，打印结果；返回进程退出码."""
     print(f"端口 {port} @ {baud}, 超时 {timeout:.1f}s")
     payload = poll(port, baud, CLS_MON, ID_MON_VER, timeout)
     if payload is None:
-        print("MON-VER 无回应. 依次检查: 模块是否上电 (灯) / 波特率 (460800 -> 38400) / "
+        print("MON-VER 无回应。依次检查：模块是否上电（灯）/ 波特率 (460800 -> 38400) / "
               "TX-RX 是否交叉 / GND 是否接 / 端口是否被别的程序占用")
         return 2
     ver = parse_mon_ver(payload)
@@ -204,7 +193,7 @@ def report(port: str, baud: int, timeout: float, want_relposned: bool) -> int:
 
 
 def selftest() -> int:
-    """用合成帧自测组帧/切帧/解析三条路径, 返回 0 表示通过."""
+    """用合成帧自测组帧/切帧/解析三条路径，返回 0 表示通过."""
     ext = [b"FWVER=HPG 1.32".ljust(30, b"\x00"), b"PROTVER=27.11".ljust(30, b"\x00")]
     payload = b"EXT CORE 1.00 (f10c36)".ljust(30, b"\x00") + b"00190000".ljust(10, b"\x00") + b"".join(ext)
     frame = ubx_frame(CLS_MON, ID_MON_VER, payload)
@@ -232,15 +221,15 @@ def selftest() -> int:
     except ValueError:
         pass
     else:
-        raise AssertionError("短载荷应报错 (不足 64 字节)")
-    print("selftest 通过: 组帧 / 切帧 / MON-VER / CFG-GNSS / RELPOSNED 解析均正常")
+        raise AssertionError("短载荷应报错（不足 64 字节）")
+    print("selftest 通过：组帧 / 切帧 / MON-VER / CFG-GNSS / RELPOSNED 解析均正常")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="UBX 轮询探针 (固件版本 / 星座 / 移动基线相对解)")
-    ap.add_argument("--port", help="串口号, 如 COM7")
-    ap.add_argument("--baud", type=int, default=460800, help="波特率 (默认 460800; UART 出厂默认 38400)")
+    ap = argparse.ArgumentParser(description="UBX 轮询探针（固件版本 / 星座 / 移动基线相对解）")
+    ap.add_argument("--port", help="串口号，如 COM7")
+    ap.add_argument("--baud", type=int, default=460800, help="波特率（默认 460800; UART 出厂默认 38400）")
     ap.add_argument("--timeout", type=float, default=2.0, help="每次轮询等待秒数")
     ap.add_argument("--poll", choices=("mon-ver", "gnss", "relposned", "all"), default="all")
     ap.add_argument("--selftest", action="store_true", help="无硬件自测")
@@ -248,12 +237,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.selftest:
         return selftest()
     if not args.port:
-        ap.error("需要 --port (或 --selftest)")
+        ap.error("需要 --port（或 --selftest）")
     try:
         return report(args.port, args.baud, args.timeout, args.poll in ("relposned", "all"))
-    except Exception as exc:  # 串口打不开/无权限等: 明确报错并给出退出码
+    except Exception as exc:  # 串口异常：明确报错并给出退出码
         print(f"失败: {type(exc).__name__}: {exc}", file=sys.stderr)
-        print("提示: 端口是否存在看设备管理器 -> 端口(COM 和 LPT); 被占用则先关掉 MP / u-center", file=sys.stderr)
+        print("提示：端口是否存在看设备管理器 -> 端口(COM 和 LPT); 被占用则先关掉 MP / u-center", file=sys.stderr)
         return 1
 
 

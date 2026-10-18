@@ -1,4 +1,5 @@
 docs/hardware/
-temp/
+temp/*
+!temp/AGENTS.md
 __pycache__/
 *.pyc

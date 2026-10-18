@@ -1,23 +1,4 @@
-r"""清洗 MinerU 转换产物: 删除等价重复 md, 校验无正文丢失后覆盖 full.md.
-
-对每个产物:
-1. 删除与 full.md 内容等价的 MinerU_markdown_*.md 副本 (不等价则保留并警告);
-2. 目录点线转列表, 标题按目录白名单还原层级 (规则见下);
-3. 覆盖 full.md 前做正文丢失校验: 行数不变, 非标题正文行全部保留, 标题文本全部保留;
-   校验不通过则不改动任何文件并报错退出.
-
-清洗规则 (确定性, 不依赖模型输出内容):
-- 目录块 (标题为"目录"的章节): 只处理以点线+页码结尾的行, 去掉点线与页码并按编号深度缩进成列表;
-- 标题: 以目录块为章节号白名单. 编号在目录中且标题能对上时才按编号 (1 / 1.1 / 1.2.3) 还原层级;
-  编号不在目录中或标题对不上的视为普通标题; 编号出现前的无编号章节保持原层级;
-  编号出现后的"注/注意/警告/提示/说明"标签降为正文粗体;
-  编号出现后的其他无编号标题挂到当前编号标题的下一级.
-
-用法:
-    python clean-markdown.py <产物目录或上级目录> [...]
-    python clean-markdown.py --dry-run docs\hardware
-    python clean-markdown.py --selftest
-"""
+r"""清洗 MinerU 转换产物：删除等价重复 md, 校验无正文丢失后覆盖 full.md。"""
 
 from __future__ import annotations
 
@@ -49,7 +30,7 @@ def same_title(left: str, right: str) -> bool:
 
 
 def parse_toc(text: str) -> dict[str, str]:
-    """解析目录块, 返回 章节号 -> 标题."""
+    """解析目录块，返回 章节号 -> 标题."""
     toc: dict[str, str] = {}
     in_toc = False
     for line in text.splitlines():
@@ -69,7 +50,7 @@ def parse_toc(text: str) -> dict[str, str]:
 
 
 def toc_lines(text: str) -> set[str]:
-    """目录块中以点线+页码结尾的行 (原文形式)."""
+    """目录块中以点线+页码结尾的行（原文形式）."""
     lines: set[str] = set()
     in_toc = False
     for line in text.splitlines():
@@ -136,7 +117,7 @@ def clean_text(text: str) -> tuple[str, dict[str, int]]:
 
 
 def verify_preserved(original: str, cleaned: str) -> list[str]:
-    """校验清洗没有丢正文: 行数不变, 非标题正文行保留, 标题文本保留."""
+    """校验清洗没有丢正文：行数不变，非标题正文行保留，标题文本保留."""
     problems: list[str] = []
     original_lines = original.splitlines()
     cleaned_lines = cleaned.splitlines()
@@ -161,7 +142,7 @@ def verify_preserved(original: str, cleaned: str) -> list[str]:
 
 
 def normalize(text: str) -> str:
-    """去掉所有空白与反斜杠转义, 用于判断副本是否等价."""
+    """去掉所有空白与反斜杠转义，用于判断副本是否等价."""
     return re.sub(r"\s+", "", text).replace("\\", "")
 
 
@@ -179,13 +160,13 @@ def find_products(paths: list[Path]) -> list[Path]:
 
 
 def process(product: Path, dry_run: bool) -> dict[str, object]:
-    """处理一个产物: 先校验清洗, 再删等价副本并覆盖 full.md. 校验失败抛 RuntimeError."""
+    """处理一个产物：先校验清洗，再删等价副本并覆盖 full.md. 校验失败抛 RuntimeError."""
     full_path = product / "full.md"
     original = full_path.read_text(encoding="utf-8")
     cleaned, stats = clean_text(original)
     problems = verify_preserved(original, cleaned)
     if problems:
-        raise RuntimeError("正文丢失校验未通过, 未改动任何文件: " + "; ".join(problems))
+        raise RuntimeError("正文丢失校验未通过，未改动任何文件：" + "; ".join(problems))
     base = normalize(original)
     removable: list[Path] = []
     warnings: list[str] = []
@@ -204,7 +185,7 @@ def process(product: Path, dry_run: bool) -> dict[str, object]:
 
 
 def selftest() -> int:
-    """离线自测: 校验器/覆盖逻辑/等价副本删除/不等价保留/dry-run 不落盘."""
+    """离线自测：校验器/覆盖逻辑/等价副本删除/不等价保留/dry-run 不落盘."""
     checks: list[tuple[str, bool]] = []
     with tempfile.TemporaryDirectory() as tmp:
         product = Path(tmp) / "样例"
@@ -265,15 +246,15 @@ def selftest() -> int:
 
 def main(argv: list[str] | None = None) -> int:
     """命令行入口."""
-    parser = argparse.ArgumentParser(description="清洗 MinerU 产物: 删除等价重复 md, 校验后覆盖 full.md.")
-    parser.add_argument("paths", nargs="*", help="产物目录, 或包含产物的上级目录")
-    parser.add_argument("--dry-run", action="store_true", help="只报告, 不删不改")
+    parser = argparse.ArgumentParser(description="清洗 MinerU 产物：删除等价重复 md, 校验后覆盖 full.md.")
+    parser.add_argument("paths", nargs="*", help="产物目录，或包含产物的上级目录")
+    parser.add_argument("--dry-run", action="store_true", help="只报告，不删不改")
     parser.add_argument("--selftest", action="store_true", help="离线自测")
     args = parser.parse_args(argv)
     if args.selftest:
         return selftest()
     if not args.paths:
-        parser.error("需要产物目录 (或 --selftest)")
+        parser.error("需要产物目录（或 --selftest）")
     products = find_products([Path(item) for item in args.paths])
     if not products:
         raise SystemExit("没有找到含 full.md 的产物目录")
@@ -294,10 +275,10 @@ def main(argv: list[str] | None = None) -> int:
                 f"标题重排 {stats['renumbered']}, 注标签 {stats['notes']}, 降级 {stats['demoted']}{suffix}"
             )
         for warning in result["warnings"]:
-            print("警告: " + str(warning), file=sys.stderr)
+            print("警告：" + str(warning), file=sys.stderr)
     if failures:
         for failure in failures:
-            print("失败: " + failure, file=sys.stderr)
+            print("失败：" + failure, file=sys.stderr)
         return 1
     return 0
 
