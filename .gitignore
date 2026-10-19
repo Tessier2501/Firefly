@@ -1,4 +1,6 @@
 docs/hardware/
+data/*
+!data/AGENTS.md
 temp/*
 !temp/AGENTS.md
 __pycache__/

@@ -320,7 +320,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--dtr", dest="dtr", action="store_true", help="打开后断言 DTR（默认）")
     parser.add_argument("--no-dtr", dest="dtr", action="store_false", help="打开后不断言 DTR")
     parser.set_defaults(dtr=True)
-    parser.add_argument("--out", help="Markdown 报告文件路径（必填；写入对应机架目录）")
+    parser.add_argument("--out", help="Markdown 报告文件路径（探测时必填；写入对应机架目录）")
     parser.add_argument(
         "--selftest", action="store_true", help="用合成 MAVLink 帧自测解码与判定（不碰串口）"
     )
@@ -334,9 +334,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.selftest:
         return selftest()
 
-    if not args.out:
-        parser.error("必须用 --out 指定 Markdown 输出路径")
-
     available = list_serial_ports()
     if args.list:
         print("当前串口:")
@@ -345,6 +342,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if not available:
             print("（没有发现任何串口）")
         return 0
+
+    if not args.out:
+        parser.error("必须用 --out 指定 Markdown 输出路径")
 
     if args.all:
         targets = available
