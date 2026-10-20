@@ -11,15 +11,18 @@
 ```
 
 - `--no-capture-output` 必须保留，否则中文输出按控制台代码页解码会乱码。
-- 需要机器可读输出时先设置 `$env:PYTHONIOENCODING = 'utf-8'`。
+- 输出经管道或重定向时设置 `$env:PYTHONIOENCODING = 'utf-8'`；脚本写文件用 `open(..., encoding='utf-8')`。
+- `conda run ... python -c "<多行>"` 会报 NotImplementedError；多行逻辑写成 .py 文件执行。
+- 本机为 Windows PowerShell 5.1：重定向写文件用 `Out-File -Encoding utf8`，读回用 `Get-Content -Encoding utf8`；脚本写文件由 Python 直接写 UTF-8。
 - 串口工具运行前关闭 Mission Planner 与 QGroundControl，或要求用户释放串口。
 
 ## 2. 当前工具
 
 - `ubx_probe.py`：直连 u-blox，读 MON-VER、CFG-GNSS、NAV-RELPOSNED；`--selftest` 无硬件自测。
-- `ports-probe.py`：探测串口链路（MAVLink / SLCAN / 静默），`--out` 指定机架目录内的 Markdown 报告文件；`--selftest` 自测；`--poke` 会先发 GCS 心跳，默认关闭。
+- `ports-probe.py`：探测串口链路，`--out` 指定机架目录内的 Markdown 报告文件；`--selftest` 自测；`--poke` 会先发 GCS 心跳，默认关闭。
 - `localize-images.py`：下载 URL 转换产物的远程图片到 `images/`，改写 `full.md`、`main.html`、`content_list.json` 的引用；`--dry-run` 预览。
-- `clean-markdown.py`：清洗 MinerU 产物：删除与 `full.md` 等价的 `MinerU_markdown_*.md` 副本，还原目录与标题层级，覆盖前校验正文不丢失；`--dry-run` 预览。
+- `clean-markdown.py`：清洗 MinerU 产物：删除与 `full.md` 等价的 `MinerU_markdown_*.md` 副本，还原目录与标题层级；`--dry-run` 预览。
+- `log-extract.py`：从 Mission Planner 日志提取固件身份、参数、模式与解锁事件、GPS/电池/RC/舵机量程、STATUSTEXT；`--selftest` 自测。
 
 常用用法：
 
@@ -29,11 +32,11 @@ $py = "$env:USERPROFILE\anaconda3\Scripts\conda.exe"
 & $py run -n myenv --no-capture-output python scripts\ports-probe.py --all --seconds 5 --out data\frame_2026_10_16_01\2026_10_16_1703_ports-probe.md
 & $py run -n myenv --no-capture-output python scripts\localize-images.py --dry-run docs\hardware\CUAV
 & $py run -n myenv --no-capture-output python scripts\clean-markdown.py --dry-run docs\hardware\SIYI
+& $py run -n myenv --no-capture-output python scripts\log-extract.py "data\frame_2026_10_16_01\2026-10-13 16-34-01.tlog" --params-csv temp\params.csv
 ```
 
 ## 3. 约定
 
-- 写盘工具必须显式指定输出路径；不改原始数据与 `docs/hardware` 原始产物。
 - 脚本输出数据与事实，不输出判断、建议或结论。
-- 仅 `localize-images.py` 联网，其余脚本离线运行。
+- 写盘工具必须显式指定输出路径；不改原始数据与 `docs/hardware` 原始产物。
 - 新增长期工具：提供 `--help`、`--dry-run` 或 `--selftest`。

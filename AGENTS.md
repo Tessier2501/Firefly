@@ -26,12 +26,13 @@ Firefly/
 
 ### 2.2 Git 操作
 
-- 禁止 `git clean -fdx` / `git clean -fX`：会删除 `docs/hardware/` 和 `temp/` 下未纳入 git 的文件；`temp/AGENTS.md` 提交前也会被删。
-- 禁止 `git add -A` / `git checkout -- .` 这种批量处理 dirty 工作树的做法。
+- 禁止 `git clean -fdx` / `git clean -fX`。
+- 禁止 `git add -A` / `git checkout -- .`。
 
 ### 2.3 Python 环境
 
-- Python 工具统一使用 conda 环境 `myenv`，环境由 Freeside 管理。本仓库不维护依赖清单；需要安装新包时读取 Freeside 规范。
+- Python 工具统一使用 conda 环境 `myenv`，环境由 Freeside 管理；需要安装新包时读取 Freeside 规范。
+- `conda` 不在 PATH，统一用 `%USERPROFILE%\anaconda3\Scripts\conda.exe run -n myenv --no-capture-output` 调用。
 
 ## 3. 记忆系统协议
 
