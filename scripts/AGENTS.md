@@ -23,6 +23,7 @@
 - `localize-images.py`：下载 URL 转换产物的远程图片到 `images/`，改写 `full.md`、`main.html`、`content_list.json` 的引用；`--dry-run` 预览。
 - `clean-markdown.py`：清洗 MinerU 产物：删除与 `full.md` 等价的 `MinerU_markdown_*.md` 副本，还原目录与标题层级；`--dry-run` 预览。
 - `log-extract.py`：从 Mission Planner 日志提取固件身份、参数、模式与解锁事件、GPS/电池/RC/舵机量程、STATUSTEXT；`--selftest` 自测。
+- `telemetry-check.py`：针对 Mission Planner 日志的时序诊断：传感器健康位变化（`--health`）、参数写入/变化时间线（`--param-changes`）、GPS fix/星数/eph 变化与首个定位（`--gps`）、磁数据统计（`--mag`）、航向/磁航向/陀螺采样（`--yaw`）、全部视图（`--all`）；`--interval` 调航向采样间隔；`--selftest` 自测。
 
 常用用法：
 
@@ -33,6 +34,7 @@ $py = "$env:USERPROFILE\anaconda3\Scripts\conda.exe"
 & $py run -n myenv --no-capture-output python scripts\localize-images.py --dry-run docs\hardware\CUAV
 & $py run -n myenv --no-capture-output python scripts\clean-markdown.py --dry-run docs\hardware\SIYI
 & $py run -n myenv --no-capture-output python scripts\log-extract.py "data\frame_2026_10_16_01\2026-10-13 16-34-01.tlog" --params-csv temp\params.csv
+& $py run -n myenv --no-capture-output python scripts\telemetry-check.py "data\frame_2026_10_16_01\2026-10-21 15-53-08.tlog" --health --gps --mag
 ```
 
 ## 3. 约定
