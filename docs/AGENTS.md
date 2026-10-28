@@ -31,9 +31,7 @@ PDF 转换产物：
 <原文件名>.pdf-<uuid>/
 |-- full.md                    正文，主读
 |-- images/                    图片
-|-- *_content_list.json        内容列表
-|-- *_origin.pdf               原始 PDF，只留存不解析
-`-- ...                        版面、块、模型 JSON
+`-- *_origin.pdf               原始 PDF，只留存不解析
 ```
 
 URL 转换产物：
@@ -41,14 +39,12 @@ URL 转换产物：
 ```text
 <网页标题>-<uuid>/
 |-- full.md                    正文，主读
-|-- main.html                  网页文件
-|-- content_list.json          内容列表
+|-- main.html                  网页文件，只留存不解析
 `-- images/                    图片
 ```
 
 - 先读 `full.md`；接口、接线、尺寸直接看 `images/`。
-- `*_origin.pdf` 不解析，只作留存与人工溯源。
-- 结构化 JSON 仅在需要定位时使用，不替代正文阅读。
-- 转换产物用 `scripts/localize-images.py` 与 `scripts/clean-markdown.py` 处理。
+- `*_origin.pdf` 和 `main.html` 不解析，只作留存与人工溯源。
+- 转换产物用 `scripts/clean-markdown.py` 清洗。
 - 本地缺料时只报告缺口，不自行下载、抓取或解析网页。
 - 飞控文档与厂商文档冲突时，以厂商文档为准。

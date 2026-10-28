@@ -1,13 +1,13 @@
-r"""清洗 MinerU 转换产物：删除等价重复 md, 还原目录与标题层级, HTML 表转 Markdown 管道表, 校验后覆盖 full.md。"""
+r"""清洗转换产物：删除等价重复 md, 还原目录与标题层级, 自动展开 HTML 表, URL 产物先本地化图片, 校验后覆盖 full.md 并删除转换中间 JSON。"""
 
 from __future__ import annotations
 
 import argparse
-import html
+import importlib.util
+import json
 import re
 import sys
 import tempfile
-from collections import Counter
 from pathlib import Path
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
@@ -15,15 +15,44 @@ TOC_LINE_RE = re.compile(r"^(.+?)\.{2,}\s*(\d+)\s*$")
 NUMBER_RE = re.compile(r"^(\d+(?:\.\d+)*)\s*(.*)$")
 NOTE_LABELS = {"注", "注意", "警告", "提示", "说明"}
 DUP_PREFIX = "MinerU_markdown_"
-TABLE_RE = re.compile(r"(?s)<table>.*?</table>")
-ROW_RE = re.compile(r"(?s)<tr[^>]*>(.*?)</tr>")
+JSON_PATTERNS = (
+    "content_list.json",
+    "*_content_list.json",
+    "*_content_list_v2.json",
+    "*_model.json",
+    "block_list.json",
+    "layout.json",
+)
+LOCALIZE_TIMEOUT = 30.0
+TABLE_RE = re.compile(r"(?s)<table([^>]*)>(.*?)</table>")
+TR_RE = re.compile(r"(?s)<tr([^>]*)>(.*?)</tr>")
 CELL_RE = re.compile(r"(?s)<t([dh])([^>]*)>(.*?)</t\1>")
-CELL_ATTR_RE = re.compile(r"(colspan|rowspan)\s*=\s*\"?(\d+)", re.IGNORECASE)
-IMAGE_RE = re.compile(r"(?s)<img[^>]*src=\"([^\"]+)\"[^>]*>")
-TAG_RE = re.compile(r"(?s)<[^>]+>")
-BREAK_RE = re.compile(r"(?i)<br\s*/?>")
-ROW_SPLIT_RE = re.compile(r"(?<!\\)\|")
-SEPARATOR_CELL_RE = re.compile(r":?-{3,}:?")
+UNSUPPORTED_TABLE_RE = re.compile(r"(?i)<(thead|tbody|tfoot|caption|colgroup|col|table)\b")
+TABLE_INDENT = "  "
+
+_localizer: object | None = None
+
+
+def localizer() -> object:
+    """加载同目录的 localize-images.py 模块（文件名带连字符，无法直接 import）."""
+    global _localizer
+    if _localizer is None:
+        path = Path(__file__).with_name("localize-images.py")
+        spec = importlib.util.spec_from_file_location("localize_images", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _localizer = module
+    return _localizer
+
+
+def collect_json_files(product: Path) -> list[Path]:
+    """产物目录下待删除的转换中间 JSON（content_list/版面/块/模型）."""
+    found: list[Path] = []
+    for pattern in JSON_PATTERNS:
+        for path in sorted(product.glob(pattern)):
+            if path not in found:
+                found.append(path)
+    return found
 
 
 def heading_level(number: str) -> int:
@@ -157,63 +186,36 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", "", text).replace("\\", "")
 
 
-def cell_text(fragment: str) -> str:
-    """HTML 单元格内容转 Markdown 行内文本."""
-    text = BREAK_RE.sub(" ", fragment)
-    text = IMAGE_RE.sub(lambda match: f"![]({match.group(1)})", text)
-    text = TAG_RE.sub("", text)
-    text = html.unescape(text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text.replace("|", r"\|")
-
-
-def table_to_markdown(table_html: str) -> list[str]:
-    """单张 HTML 表转 GFM 管道表行, 合并单元格用空单元格占位; 无行时原样返回."""
-    grid: list[list[str]] = []
-    covered: list[list[bool]] = []
-
-    def ensure(row: int) -> None:
-        while len(grid) <= row:
-            grid.append([])
-            covered.append([])
-
-    for row_index, inner in enumerate(ROW_RE.findall(table_html)):
-        ensure(row_index)
-        column = 0
-        for _tag, attrs, content in CELL_RE.findall(inner):
-            while column < len(covered[row_index]) and covered[row_index][column]:
-                column += 1
-            spans = {key.lower(): int(value) for key, value in CELL_ATTR_RE.findall(attrs)}
-            colspan = max(1, spans.get("colspan", 1))
-            rowspan = max(1, spans.get("rowspan", 1))
-            for offset in range(rowspan):
-                ensure(row_index + offset)
-                while len(grid[row_index + offset]) < column + colspan:
-                    grid[row_index + offset].append("")
-                    covered[row_index + offset].append(False)
-            grid[row_index][column] = cell_text(content)
-            for offset in range(rowspan):
-                for step in range(colspan):
-                    covered[row_index + offset][column + step] = True
-            column += colspan
-    if not grid:
-        return [table_html]
-    width = max(len(row) for row in grid)
-    lines: list[str] = []
-    for index, row in enumerate(grid):
-        cells = row + [""] * (width - len(row))
-        lines.append("| " + " | ".join(cells) + " |")
-        if index == 0:
-            lines.append("| " + " | ".join(["---"] * width) + " |")
+def format_table_lines(table_html: str) -> list[str] | None:
+    """把单张 HTML 表展开为 2 空格缩进的多行; 结构不支持时返回 None（保持原样）."""
+    match = TABLE_RE.fullmatch(table_html)
+    if not match:
+        return None
+    attrs, inner = match.group(1), match.group(2)
+    if UNSUPPORTED_TABLE_RE.search(inner):
+        return None
+    rows = TR_RE.findall(inner)
+    if not rows or TR_RE.sub("", inner).strip():
+        return None
+    lines: list[str] = [f"<table{attrs}>"]
+    for tr_attrs, row_inner in rows:
+        cells = CELL_RE.findall(row_inner)
+        if not cells or CELL_RE.sub("", row_inner).strip():
+            return None
+        lines.append(f"{TABLE_INDENT}<tr{tr_attrs}>")
+        for tag, cell_attrs, content in cells:
+            lines.append(f"{TABLE_INDENT * 2}<t{tag}{cell_attrs}>{content.strip()}</t{tag}>")
+        lines.append(f"{TABLE_INDENT}</tr>")
+    lines.append("</table>")
     return lines
 
 
-def convert_html_tables(text: str) -> tuple[str, int]:
-    """把正文中的 HTML 表转换为管道表, 代码围栏内不处理; 返回 (文本, 转换张数)."""
+def format_html_tables(text: str) -> tuple[str, int]:
+    """把正文（代码围栏外）的 HTML 表展开为缩进多行; 返回 (文本, 格式化张数)."""
     newline = "\r\n" if "\r\n" in text else "\n"
     lines = text.splitlines()
     out: list[str] = []
-    converted = 0
+    formatted = 0
     in_fence = False
     index = 0
     while index < len(lines):
@@ -223,7 +225,7 @@ def convert_html_tables(text: str) -> tuple[str, int]:
             out.append(line)
             index += 1
             continue
-        if in_fence or "<table>" not in line:
+        if in_fence or "<table" not in line:
             out.append(line)
             index += 1
             continue
@@ -233,133 +235,43 @@ def convert_html_tables(text: str) -> tuple[str, int]:
             block += newline + lines[index]
 
         def replace(match: re.Match[str]) -> str:
-            nonlocal converted
-            markdown = table_to_markdown(match.group(0))
-            if markdown != [match.group(0)]:
-                converted += 1
-            return "\n".join(markdown)
+            nonlocal formatted
+            candidate = format_table_lines(match.group(0))
+            if candidate is None:
+                return match.group(0)
+            if candidate != match.group(0).splitlines():
+                formatted += 1
+            return "\n".join(candidate)
 
         out.extend(TABLE_RE.sub(replace, block).split("\n"))
         index += 1
     result = newline.join(out)
     if text.endswith(("\n", "\r\n")):
         result += newline
-    return result, converted
+    return result, formatted
 
 
-def split_table_row(line: str) -> list[str]:
-    """拆分管道表行, 跳过转义竖线."""
-    body = line.strip()
-    if body.startswith("|"):
-        body = body[1:]
-    if body.endswith("|"):
-        body = body[:-1]
-    return [part.replace("\\|", "|").strip() for part in ROW_SPLIT_RE.split(body)]
-
-
-def markdown_table_blocks(text: str) -> list[list[str]]:
-    """提取连续的管道表行块, 代码围栏内不算."""
-    blocks: list[list[str]] = []
-    current: list[str] = []
-    in_fence = False
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("```"):
-            in_fence = not in_fence
-        is_row = not in_fence and stripped.startswith("|") and stripped.endswith("|") and len(stripped) > 1
-        if is_row:
-            current.append(stripped)
-            continue
-        if current:
-            blocks.append(current)
-            current = []
-    if current:
-        blocks.append(current)
-    return blocks
-
-
-def has_table_outside_fence(text: str) -> bool:
-    """正文（代码围栏外）是否还有 HTML 表."""
-    in_fence = False
-    for line in text.splitlines():
-        if line.lstrip().startswith("```"):
-            in_fence = not in_fence
-            continue
-        if not in_fence and "<table>" in line:
-            return True
-    return False
-
-
-def block_cells(blocks: list[list[str]]) -> tuple[Counter[str], int]:
-    """统计管道表块的非空单元格与行数（不含分隔行）."""
-    cells: Counter[str] = Counter()
-    rows = 0
-    for block in blocks:
-        for row in block:
-            parts = split_table_row(row)
-            if parts and all(SEPARATOR_CELL_RE.fullmatch(part) for part in parts):
-                continue
-            rows += 1
-            for part in parts:
-                if part:
-                    cells[part] += 1
-    return cells, rows
-
-
-def verify_tables(source: str, converted: str) -> list[str]:
-    """校验 HTML 表转换未丢内容: 表格数/行数/单元格文本/表格外行."""
+def verify_formatting(source: str, formatted: str) -> list[str]:
+    """校验 HTML 表格式化只改了空白: 归一化文本一致, 表数一致, 表内无空行."""
     problems: list[str] = []
-    if has_table_outside_fence(converted):
-        problems.append("转换后仍有未处理的 HTML 表")
-    source_tables = TABLE_RE.findall(source)
-    blocks = markdown_table_blocks(converted)
-    existing_blocks = markdown_table_blocks(source)
-    if len(existing_blocks) + len(source_tables) != len(blocks):
-        return problems + [f"表格数量不一致: 原文 {len(existing_blocks)}+{len(source_tables)}, 转换后 {len(blocks)}"]
-    expected_cells, expected_rows = block_cells(existing_blocks)
-    for table in source_tables:
-        expected_rows += len(ROW_RE.findall(table))
-        for _tag, _attrs, content in CELL_RE.findall(table):
-            text = cell_text(content).replace("\\|", "|")
-            if text:
-                expected_cells[text] += 1
-    actual_cells, actual_rows = block_cells(blocks)
-    if expected_cells != actual_cells:
-        missing = sum((expected_cells - actual_cells).values())
-        extra = sum((actual_cells - expected_cells).values())
-        problems.append(f"单元格文本不一致: 缺失 {missing} 处, 多出 {extra} 处")
-    if expected_rows != actual_rows:
-        problems.append(f"表格行数不一致: 原文 {expected_rows}, 转换后 {actual_rows}")
-
-    def other_lines(text: str) -> Counter[str]:
-        """表格标记之外的行（多行表整块跳过, 代码围栏内不动）."""
-        kept: list[str] = []
-        in_fence = False
-        in_table = False
-        for line in text.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("```"):
-                in_fence = not in_fence
-                kept.append(line)
-                continue
-            if in_fence:
-                kept.append(line)
-                continue
-            if in_table:
-                if "</table>" in line:
-                    in_table = False
-                continue
-            if "<table>" in line:
-                if "</table>" not in line:
-                    in_table = True
-                continue
-            if stripped.startswith("|") and stripped.endswith("|") and len(stripped) > 1:
-                continue
-            kept.append(line)
-        return Counter(kept)
-
-    if other_lines(source) != other_lines(converted):
-        problems.append("表格以外的行被改动")
+    if normalize(source) != normalize(formatted):
+        problems.append("格式化改动了正文内容（去空白后不一致）")
+    source_tables = len(TABLE_RE.findall(source))
+    formatted_tables = len(TABLE_RE.findall(formatted))
+    if source_tables != formatted_tables:
+        problems.append(f"表格数量不一致: 原文 {source_tables}, 格式化后 {formatted_tables}")
+    in_table = False
+    for line in formatted.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("<table"):
+            in_table = True
+            continue
+        if in_table and stripped.startswith("</table>"):
+            in_table = False
+            continue
+        if in_table and not stripped:
+            problems.append("格式化后的表格内部出现空行")
+            break
     return problems
 
 
@@ -377,7 +289,7 @@ def find_products(paths: list[Path]) -> list[Path]:
 
 
 def process(product: Path, dry_run: bool) -> dict[str, object]:
-    """处理一个产物：清洗正文（含 HTML 表转管道表）并校验，再删等价副本并覆盖 full.md. 校验失败抛 RuntimeError."""
+    """处理一个产物：清洗正文并展开 HTML 表，URL 产物先本地化图片，再覆盖 full.md、删等价副本与中间 JSON. 校验失败抛 RuntimeError."""
     full_path = product / "full.md"
     original = full_path.read_text(encoding="utf-8")
     cleaned, stats = clean_text(original)
@@ -385,12 +297,12 @@ def process(product: Path, dry_run: bool) -> dict[str, object]:
     if problems:
         raise RuntimeError("正文丢失校验未通过，未改动任何文件：" + "; ".join(problems))
     stats["tables"] = 0
-    if "<table>" in cleaned:
-        converted, table_count = convert_html_tables(cleaned)
-        problems = verify_tables(cleaned, converted)
+    if "<table" in cleaned:
+        formatted, table_count = format_html_tables(cleaned)
+        problems = verify_formatting(cleaned, formatted)
         if problems:
-            raise RuntimeError("HTML 表转换校验未通过，未改动任何文件：" + "; ".join(problems))
-        cleaned = converted
+            raise RuntimeError("HTML 表格式化校验未通过，未改动任何文件：" + "; ".join(problems))
+        cleaned = formatted
         stats["tables"] = table_count
     base = normalize(original)
     removable: list[Path] = []
@@ -401,16 +313,35 @@ def process(product: Path, dry_run: bool) -> dict[str, object]:
         else:
             warnings.append(f"{duplicate.name} 与 full.md 内容不等价, 保留")
     changed = cleaned != original
+    module = localizer()
+    url_product = module.is_url_product(product)
+    pending_urls = module.collect_urls(product) if url_product else []
+    json_files = collect_json_files(product)
+    localized = len(pending_urls) if dry_run else 0
     if not dry_run:
         for duplicate in removable:
             duplicate.unlink()
         if changed:
             full_path.write_text(cleaned, encoding="utf-8", newline="")
-    return {"stats": stats, "changed": changed, "pruned": len(removable), "warnings": warnings}
+        if url_product:
+            downloaded, reused, errors = module.localize(product, LOCALIZE_TIMEOUT, dry_run=False)
+            if errors:
+                raise RuntimeError("图片本地化失败，未删除转换 JSON：" + "; ".join(errors[:3]))
+            localized = downloaded + reused
+        for path in json_files:
+            path.unlink()
+    return {
+        "stats": stats,
+        "changed": changed,
+        "pruned": len(removable),
+        "localized": localized,
+        "json": len(json_files),
+        "warnings": warnings,
+    }
 
 
 def selftest() -> int:
-    """离线自测：校验器/覆盖逻辑/等价副本删除/不等价保留/dry-run 不落盘."""
+    """离线自测：校验器/覆盖逻辑/等价副本删除/HTML 表格式化/图片本地化/JSON 删除/dry-run 不落盘."""
     checks: list[tuple[str, bool]] = []
     with tempfile.TemporaryDirectory() as tmp:
         product = Path(tmp) / "样例"
@@ -462,32 +393,91 @@ def selftest() -> int:
         checks.append(("等价副本已删除", not equivalent.exists()))
         checks.append(("不等价副本保留并警告", different.exists() and len(result["warnings"]) == 1))
 
-    html_table = '<table><tr><td>名称</td><td>值</td></tr><tr><td>甲</td><td>1</td></tr></table>'
-    converted, converted_count = convert_html_tables("说明\n\n" + html_table + "\n\n正文\n")
-    checks.append(("HTML 表转管道表", converted_count == 1 and "| 名称 | 值 |" in converted and "| --- | --- |" in converted and "<table>" not in converted))
-    merged, _ = convert_html_tables('<table><tr><td>a</td><td>b</td></tr><tr><td colspan="2">c</td></tr></table>')
-    checks.append(("colspan 空单元格占位", "| c |  |" in merged))
-    spanned, _ = convert_html_tables('<table><tr><td rowspan="2">a</td><td>b</td></tr><tr><td>c</td></tr></table>')
-    checks.append(("rowspan 空单元格占位", "|  | c |" in spanned))
-    escaped, _ = convert_html_tables('<table><tr><td>&lt;</td><td>a|b</td></tr><tr><td><img src="images/x.jpg"/></td><td>&amp;</td></tr></table>')
-    checks.append(("实体/竖线/图片", "| < | a\\|b |" in escaped and "| ![](images/x.jpg) | & |" in escaped))
-    fenced, fenced_count = convert_html_tables("```\n" + html_table + "\n```\n")
-    checks.append(("代码围栏内不转换", fenced_count == 0 and "<table>" in fenced))
-    checks.append(("正常转换通过表格校验", not verify_tables(html_table + "\n", convert_html_tables(html_table + "\n")[0])))
-    damaged = convert_html_tables(html_table + "\n")[0].replace("甲", "", 1)
-    checks.append(("校验器能发现单元格丢失", bool(verify_tables(html_table + "\n", damaged))))
+    one_line_table = '<table><tr><td>名称</td><td>值</td></tr><tr><td>甲</td><td>1</td></tr></table>'
+    formatted_table, formatted_count = format_html_tables("说明\n\n" + one_line_table + "\n\n正文\n")
+    expected = "\n".join([
+        "<table>",
+        "  <tr>",
+        "    <td>名称</td>",
+        "    <td>值</td>",
+        "  </tr>",
+        "  <tr>",
+        "    <td>甲</td>",
+        "    <td>1</td>",
+        "  </tr>",
+        "</table>",
+    ])
+    checks.append(("HTML 表展开为缩进多行", formatted_count == 1 and expected in formatted_table and "<table><tr>" not in formatted_table))
+    once, count_once = format_html_tables(one_line_table)
+    twice, count_twice = format_html_tables(once)
+    checks.append(("格式化幂等", count_once == 1 and count_twice == 0 and twice == once))
+    with_attrs = '<table><tr><td colspan="2">a</td></tr><tr><td colspan="2" rowspan="1">b</td></tr></table>'
+    attrs_formatted, _ = format_html_tables(with_attrs)
+    checks.append(("保留标签属性", '<td colspan="2">a</td>' in attrs_formatted and '<td colspan="2" rowspan="1">b</td>' in attrs_formatted))
+    fenced, fenced_count = format_html_tables("```\n" + one_line_table + "\n```\n")
+    checks.append(("代码围栏内不处理", fenced_count == 0 and fenced == "```\n" + one_line_table + "\n```\n"))
+    unsupported, unsupported_count = format_html_tables('<table><thead><tr><th>a</th></tr></thead><tbody><tr><td>b</td></tr></tbody></table>')
+    checks.append(("不支持的结构保持原样", unsupported_count == 0 and "<thead>" in unsupported))
+    checks.append(("格式化通过校验", not verify_formatting(one_line_table + "\n", format_html_tables(one_line_table + "\n")[0])))
+    checks.append(("校验器能发现内容改动", bool(verify_formatting(one_line_table + "\n", format_html_tables(one_line_table + "\n")[0].replace("甲", "乙")))))
+    checks.append(("表格内不插入空行", "\n\n" not in format_html_tables(one_line_table)[0].strip()))
 
     with tempfile.TemporaryDirectory() as table_tmp:
         product = Path(table_tmp) / "带表"
         product.mkdir()
-        (product / "full.md").write_text("# 手册\n\n正文\n\n" + html_table + "\n", encoding="utf-8")
+        (product / "full.md").write_text("# 手册\n\n正文\n\n" + one_line_table + "\n", encoding="utf-8")
+        duplicate = product / (DUP_PREFIX + "dup.md")
+        duplicate.write_text("# 手册\n\n正文\n\n" + one_line_table + "\n", encoding="utf-8")
         dry = process(product, dry_run=True)
-        checks.append(("dry-run 报告表格数且不落盘", dry["stats"]["tables"] == 1 and "<table>" in (product / "full.md").read_text(encoding="utf-8")))
+        checks.append(("dry-run 报告表格数且不落盘", dry["stats"]["tables"] == 1 and dry["pruned"] == 1 and "<table><tr>" in (product / "full.md").read_text(encoding="utf-8")))
         process(product, dry_run=False)
         after = (product / "full.md").read_text(encoding="utf-8")
-        checks.append(("写盘后无 HTML 表", "<table>" not in after and "| 名称 | 值 |" in after))
+        checks.append(("写盘后表格已展开且副本已删", "  <tr>" in after and "<table><tr>" not in after and not duplicate.exists()))
         again = process(product, dry_run=True)
         checks.append(("重复运行无变化", not again["changed"] and again["stats"]["tables"] == 0))
+
+    with tempfile.TemporaryDirectory() as json_tmp:
+        product = Path(json_tmp) / "带JSON"
+        product.mkdir()
+        (product / "full.md").write_text("# 手册\n\n正文\n", encoding="utf-8")
+        for name in ("abc_content_list.json", "abc_content_list_v2.json", "abc_model.json", "block_list.json", "layout.json"):
+            (product / name).write_text("[]", encoding="utf-8")
+        (product / "custom.json").write_text("[]", encoding="utf-8")
+        (product / "abc_origin.pdf").write_bytes(b"%PDF-1.4")
+        dry = process(product, dry_run=True)
+        checks.append(("dry-run 报告 JSON 删除数且不落盘", dry["json"] == 5 and (product / "layout.json").exists()))
+        result = process(product, dry_run=False)
+        checks.append(("实跑删除转换 JSON", result["json"] == 5 and not any(
+            (product / name).exists()
+            for name in ("abc_content_list.json", "abc_content_list_v2.json", "abc_model.json", "block_list.json", "layout.json")
+        )))
+        checks.append(("JSON 之外的产物保留", (product / "custom.json").exists() and (product / "abc_origin.pdf").exists()))
+        again = process(product, dry_run=True)
+        checks.append(("删 JSON 后再次运行无变化", not again["changed"] and again["json"] == 0))
+
+    with tempfile.TemporaryDirectory() as url_tmp:
+        product = Path(url_tmp) / "URL产物"
+        product.mkdir()
+        (product / "full.md").write_text("![a](https://example.invalid/a.png)\n", encoding="utf-8")
+        (product / "main.html").write_text('<img src="https://example.invalid/b.jpg">', encoding="utf-8")
+        (product / "content_list.json").write_text(
+            json.dumps([{"type": "image", "content": {"url": "https://example.invalid/c.webp"}}], ensure_ascii=False),
+            encoding="utf-8",
+        )
+        module = localizer()
+        original_fetch = module.fetch
+        module.fetch = lambda url, timeout: b"\x89PNG\r\n\x1a\nfake"
+        try:
+            dry = process(product, dry_run=True)
+            checks.append(("URL 产物 dry-run 报告本地化与 JSON 删除", dry["localized"] == 3 and dry["json"] == 1 and (product / "content_list.json").exists()))
+            result = process(product, dry_run=False)
+        finally:
+            module.fetch = original_fetch
+        after = (product / "full.md").read_text(encoding="utf-8")
+        checks.append(("URL 产物先本地化再删 JSON", result["localized"] == 3 and result["json"] == 1 and "https://" not in after))
+        checks.append(("本地化后 JSON 已删且 main.html 保留", not (product / "content_list.json").exists() and (product / "main.html").exists()))
+        refs = re.findall(r"!\[[^\]]*\]\(images/([^)]+)\)", after)
+        checks.append(("本地图片文件已生成", len(refs) == 1 and (product / "images" / refs[0]).is_file()))
     ok = True
     for name, passed in checks:
         print(f"  {'OK  ' if passed else 'FAIL'} {name}")
@@ -498,7 +488,7 @@ def selftest() -> int:
 
 def main(argv: list[str] | None = None) -> int:
     """命令行入口."""
-    parser = argparse.ArgumentParser(description="清洗 MinerU 产物：删除等价重复 md, 还原标题层级, HTML 表转管道表, 校验后覆盖 full.md.")
+    parser = argparse.ArgumentParser(description="清洗转换产物：还原标题层级、展开 HTML 表；URL 产物先本地化图片；校验后覆盖 full.md，删除等价副本与转换中间 JSON.")
     parser.add_argument("paths", nargs="*", help="产物目录，或包含产物的上级目录")
     parser.add_argument("--dry-run", action="store_true", help="只报告，不删不改")
     parser.add_argument("--selftest", action="store_true", help="离线自测")
@@ -519,14 +509,22 @@ def main(argv: list[str] | None = None) -> int:
             continue
         stats = result["stats"]
         suffix = " (dry-run)" if args.dry_run else ""
-        if not result["changed"] and not result["pruned"]:
+        extras: list[str] = []
+        if result["localized"]:
+            extras.append(f"图片本地化 {result['localized']}")
+        if result["json"]:
+            extras.append(f"JSON 删除 {result['json']}")
+        if not result["changed"] and not result["pruned"] and not extras:
             print(f"{product}: 无变化{suffix}")
         else:
-            print(
+            message = (
                 f"{product}: 副本删除 {result['pruned']}, 目录行 {stats['toc']}, "
                 f"标题重排 {stats['renumbered']}, 注标签 {stats['notes']}, 降级 {stats['demoted']}, "
-                f"表格转换 {stats['tables']}{suffix}"
+                f"表格格式化 {stats['tables']}"
             )
+            if extras:
+                message += ", " + ", ".join(extras)
+            print(message + suffix)
         for warning in result["warnings"]:
             print("警告：" + str(warning), file=sys.stderr)
     if failures:
