@@ -21,7 +21,7 @@
 - `ubx_probe.py`：直连 u-blox，读 MON-VER、CFG-GNSS、NAV-RELPOSNED；`--selftest` 无硬件自测。
 - `ports-probe.py`：探测串口链路，`--out` 指定机架目录内的 Markdown 报告文件；`--selftest` 自测；`--poke` 会先发 GCS 心跳，默认关闭。
 - `localize-images.py`：下载 URL 转换产物的远程图片到 `images/`，改写 `full.md`、`main.html`、`content_list.json` 的引用；`--dry-run` 预览。
-- `clean-markdown.py`：清洗 MinerU 产物：删除与 `full.md` 等价的 `MinerU_markdown_*.md` 副本，还原目录与标题层级；`--dry-run` 预览。
+- `clean-markdown.py`：清洗 MinerU 产物：删除与 `full.md` 等价的 `MinerU_markdown_*.md` 副本，还原目录与标题层级，把 HTML 表转换为 Markdown 管道表（合并单元格用空单元格占位）；`--dry-run` 预览。
 - `log-extract.py`：从 Mission Planner 日志提取固件身份、参数、模式与解锁事件、GPS/电池/RC/舵机量程、STATUSTEXT；`--selftest` 自测。
 - `telemetry-check.py`：针对 Mission Planner 日志的时序诊断：传感器健康位变化（`--health`）、参数写入/变化时间线（`--param-changes`）、GPS fix/星数/eph 变化与首个定位（`--gps`）、磁数据统计（`--mag`）、航向/磁航向/陀螺采样（`--yaw`）、全部视图（`--all`）；`--interval` 调航向采样间隔；`--selftest` 自测。
 
