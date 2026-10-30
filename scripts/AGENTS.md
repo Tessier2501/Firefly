@@ -19,7 +19,7 @@
 ## 2. 当前工具
 
 - `ubx_probe.py`：直连 u-blox，读 MON-VER、CFG-GNSS、NAV-RELPOSNED；`--selftest` 无硬件自测。
-- `ports-probe.py`：探测串口链路，`--out` 指定机架目录内的 Markdown 报告文件；`--selftest` 自测；`--poke` 会先发 GCS 心跳，默认关闭。
+- `ports-probe.py`：探测串口链路，`--out` 指定机架目录内的 Markdown 报告文件；`--poke` 会先发 GCS 心跳，默认关闭；`--selftest` 自测。
 - `localize-images.py`：下载 URL 转换产物的远程图片到 `images/`，改写 `full.md`、`main.html`、`content_list.json` 的引用；`clean-markdown.py` 内部会先调用它再删除 JSON，单独运行须在清洗之前；`--dry-run` 预览。
 - `clean-markdown.py`：清洗转换产物：删除与 `full.md` 等价的 `MinerU_markdown_*.md` 副本，还原目录与标题层级，把 HTML 表展开为 2 空格缩进的多行，URL 产物先本地化远程图片，最后删除转换中间 JSON（`content_list`、`content_list_v2`、`model`、`block_list`、`layout`）；`--dry-run` 预览。
 - `log-extract.py`：从 Mission Planner 日志提取固件身份、参数、模式与解锁事件、GPS/电池/RC/舵机量程、STATUSTEXT；`--selftest` 自测。
